@@ -146,16 +146,6 @@ def all_row(sheet, rowstart: int = 0, rowend: int = 0):
     return last_col, last_row, list_all
 
 
-# Windows環境のみ メッセージボックスを表示する
-import win32api  # 参考:http://housoubu.mizusasi.net/data/prog/p003.html
-import win32con
-
-
-def MessageBox(application, alert="エラーが発生しました", title="エラー", button="MB_OK", icon="MB_ICONERROR"):
-    flg = win32api.MessageBox(application.app.hwnd, alert, title, win32con.__dict__[button] | win32con.__dict__[icon],)
-    return flg
-
-
 def FreezePanes(ws=None, wb=None, row=1, col=0):
     """ウインドウ枠の固定
 
