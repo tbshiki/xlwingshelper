@@ -1,3 +1,6 @@
 from setuptools import setup, find_packages
+import xlwingshelper
 
-setup(name="xlwingshelper", version="0.1", packages=find_packages())
+VERSION = xlwingshelper.__version__
+
+setup(name="xlwingshelper", version=VERSION, packages=find_packages())

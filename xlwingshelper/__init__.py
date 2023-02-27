@@ -1,2 +1,4 @@
-from xlwingshelper.helper import *
-from xlwingshelper.windows import *
+from .helper import *
+from .windows import *
+
+__version__ = "0.1"
