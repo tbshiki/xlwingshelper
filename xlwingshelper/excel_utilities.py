@@ -1,149 +1,5 @@
 import xlwings as xw
-from importlib import import_module
 import os
-
-# 参考
-# https://tanuhack.com/num2alpha-alpha2num/
-
-# アルファベット小文字→数値
-# 例：z or Z→26、aa or AA→27、all or ALL→1000
-
-# 小文字
-def a2num(alpha):
-    num = 0
-    for index, item in enumerate(list(alpha)):
-        num += pow(26, len(alpha) - index - 1) * (ord(item) - ord("a") + 1)
-    return num
-
-
-# 大文字
-def A2num(alpha):
-    num = 0
-    for index, item in enumerate(list(alpha)):
-        num += pow(26, len(alpha) - index - 1) * (ord(item) - ord("A") + 1)
-    return num
-
-
-# 数値→アルファベット
-# 例：26→z or Z、27→aa or AA、10000→all or ALL
-
-# 小文字
-def num2a(num):
-    if num <= 26:
-        return chr(96 + num)
-    elif num % 26 == 0:
-        return num2a(num // 26 - 1) + chr(122)
-    else:
-        return num2a(num // 26) + chr(96 + num % 26)
-
-
-# 大文字
-def num2A(num):
-    if num <= 26:
-        return chr(64 + num)
-    elif num % 26 == 0:
-        return num2A(num // 26 - 1) + chr(90)
-    else:
-        return num2A(num // 26) + chr(64 + num % 26)
-
-
-def col_dict(sheet, colstart: int = 0, colend: int = 0):
-    last_col, last_row = last(sheet)
-
-    if colend == 0:
-        colend = last_col
-
-    list_all: dict = []
-    for col in range(int(last_col))[colstart:colend]:
-        strcol = num2A(col + 1)
-        list_all.append(sheet.range(strcol + "1:" + strcol + str(last_row)).value)
-
-    return last_col, last_row, list_all
-
-
-# 1行目の最大列を取得して、その全ての列から最大行を返す
-def all(sheet):
-    max_col = sheet.range(1, sheet.cells.last_cell.column).end("left").column
-
-    last_row = 1
-    for i in range(max_col + 1)[1:]:
-        max_row = sheet.range(sheet.cells.last_cell.row, i).end("up").row
-        if max_row > last_row:
-            last_row = max_row
-    return last_row
-
-
-# 1行目の最大列を取得して、1行目の最大列とその全ての列から最大行を返す
-def last(sheet):
-    """_summary_
-
-    Example:
-        last_col, last_row = xlwings_me.last(sheet)
-
-    Args:
-        sheet (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    last_col = sheet.range(1, sheet.cells.last_cell.column).end("left").column
-
-    last_row = 1
-    for i in range(last_col + 1)[1:]:
-        max_row = sheet.range(sheet.cells.last_cell.row, i).end("up").row
-        if max_row > last_row:
-            last_row = max_row
-
-    return last_col, last_row
-
-
-# 指定されたcol(列)の最大行(row)を返す
-def col(sheet, col=1):
-    """_summary_
-
-    Example:
-        i = xlwings_me.col(sheet, col)
-
-    Args:
-        sheet (_type_): _description_
-        col (str): "A"
-
-    Returns:
-        int : last_row
-    """
-    last_row = sheet.range(sheet.cells.last_cell.row, A2num(col)).end("up").row
-    return last_row
-
-
-# 最大行と最大列、列基準のリストを返す(縦向きのリスト)
-def all_col(sheet, colstart: int = 0, colend: int = 0):
-    last_col, last_row = last(sheet)
-
-    if colend == 0:
-        colend = last_col
-
-    list_all: list = []
-    for col in range(int(last_col))[colstart:colend]:
-        strcol = num2A(col + 1)
-        list_all.append(sheet.range(strcol + "1:" + strcol + str(last_row)).value)
-
-    return last_col, last_row, list_all
-
-
-# 最大行と最大列、行基準のリストを返す(横向きのリスト)
-def all_row(sheet, rowstart: int = 0, rowend: int = 0):
-    last_col, last_row = last(sheet)
-
-    if rowend == 0:
-        rowend = last_row
-
-    strlastcol = num2A(last_col)
-
-    list_all: list = []
-    for row in range(int(last_row))[rowstart:rowend]:
-        list_all.append(sheet.range("A" + str(row + 1) + ":" + str(strlastcol) + str(row + 1)).value)
-
-    return last_col, last_row, list_all
 
 
 def FreezePanes(ws=None, wb=None, row=1, col=0):
@@ -209,7 +65,14 @@ def check_wb_create(save_wb_path, extension=".xlsx"):
         counter = 2
         while True:
             try:
-                os.rename(save_wb_path, str(os.path.splitext(save_wb_path)[0]) + " (" + str(counter) + ")" + extension)
+                os.rename(
+                    save_wb_path,
+                    str(os.path.splitext(save_wb_path)[0])
+                    + " ("
+                    + str(counter)
+                    + ")"
+                    + extension,
+                )
             except:
                 pass
             else:
@@ -263,7 +126,9 @@ def check_sheet_add(sheet_name, wb=None, position=0):
     return sh
 
 
-def check_sheet_copy(sheet_source_name, wb_source=None, wb_destination=None, position=0):
+def check_sheet_copy(
+    sheet_source_name, wb_source=None, wb_destination=None, position=0
+):
     """同名シートが存在するかチェックしてシートコピー
 
     Args:
@@ -298,7 +163,8 @@ def check_sheet_copy(sheet_source_name, wb_source=None, wb_destination=None, pos
         sheet = wb_destination.sheets[sheet_source_name]
         sheet.name = f"{sheet_source_name} ({counter})"
 
-    add_sh = wb_source.sheets[sheet_source_name].copy(before=wb_destination.sheets[position])
+    add_sh = wb_source.sheets[sheet_source_name].copy(
+        before=wb_destination.sheets[position]
+    )
 
     return add_sh
-
