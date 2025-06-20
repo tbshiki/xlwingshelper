@@ -1,5 +1,10 @@
-import xlwings as xw
+import logging
 import os
+
+import xlwings as xw
+
+# loggingを設定
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 def FreezePanes(ws=None, row=1, col=0):
@@ -12,16 +17,15 @@ def FreezePanes(ws=None, row=1, col=0):
         col (int, optional): 固定したい列番号
     """
     try:
-        # wsがなければアクティブなものを取得
         if ws is None:
             ws = xw.books.active.sheets.active
 
         ws.activate()
-        wb = ws.book  # wsからbookを確実に取得
+        wb = ws.book
 
         aw = wb.app.api.ActiveWindow
         if aw is None:
-            print("ActiveWindowが取得できません。")
+            logging.warning("ActiveWindowが取得できません。")
             return False
 
         aw.FreezePanes = False
@@ -30,7 +34,7 @@ def FreezePanes(ws=None, row=1, col=0):
         aw.FreezePanes = True
         return True
     except Exception as e:
-        print(f"FreezePanesで例外発生: {e}")
+        logging.error(f"FreezePanesで例外発生: {e}")
         return False
 
 
@@ -50,7 +54,7 @@ def FreezePanes0(ws=None):
         aw = wb.app.api.ActiveWindow
 
         if aw is None:
-            print("ActiveWindowが取得できません")
+            logging.warning("ActiveWindowが取得できません")
             return False
 
         aw.FreezePanes = False
@@ -58,118 +62,128 @@ def FreezePanes0(ws=None):
         aw.SplitRow = 0
         return True
     except Exception as e:
-        print(f"FreezePanes0で例外発生: {e}")
+        logging.error(f"FreezePanes0で例外発生: {e}")
         return False
 
 
-def check_wb_create(save_wb_path, extension=".xlsx"):
-    """同名のブックが存在するかチェックしてブック作成
+def check_wb_create(save_wb_path):
+    """
+    同名のブックが存在するかチェックしてブックを作成します。
+    存在する場合、既存のブックをリネームしてバックアップします。
+
     Args:
-        book_name (str): ブック名
-        wb (xw.Book, optional): xw.Book. Defaults to None.
-        position (int, optional): 位置. Defaults to 0.
+        save_wb_path (str): 保存するブックのパス
 
     Returns:
-        bool: True:存在する, False:存在しない
-        wb: ワークブック
+        xw.Book or None: 作成されたワークブック、または失敗した場合はNone
     """
-
-    if os.path.exists(save_wb_path):
-        counter = 2
-        while True:
-            try:
-                os.rename(
-                    save_wb_path,
-                    str(os.path.splitext(save_wb_path)[0]) + " (" + str(counter) + ")" + extension,
-                )
-            except:
-                pass
-            else:
-                break
-            if counter > 50:  # 50も作成してたらおかしいので終了
-                return False
-            counter += 1
-    wb = xw.Book()
-    wb.save(save_wb_path)
-
-    return wb
+    try:
+        if os.path.exists(save_wb_path):
+            base, ext = os.path.splitext(save_wb_path)
+            counter = 2
+            while True:
+                new_path = f"{base} ({counter}){ext}"
+                try:
+                    os.rename(save_wb_path, new_path)
+                    logging.info(f"既存のファイル '{save_wb_path}' を '{new_path}' にリネームしました。")
+                    break
+                except OSError:
+                    counter += 1
+                    if counter > 50:
+                        logging.error("50回リネームを試みましたが、ユニークなファイル名を作成できませんでした。")
+                        return None
+        wb = xw.Book()
+        wb.save(save_wb_path)
+        return wb
+    except Exception as e:
+        logging.error(f"check_wb_createで例外発生: {e}")
+        return None
 
 
 def check_sheet_add(sheet_name, wb=None, position=0):
-    """同名シートが存在するかチェックしてシート追加
+    """
+    同名シートが存在するかチェックしてシートを追加します。
+    存在する場合、既存のシートをリネームします。
 
     Args:
         sheet_name (str): シート名
-        wb (xw.Book, optional): xw.Book. Defaults to None.
-        position (int, optional): 位置. Defaults to 0.
+        wb (xw.Book, optional): 対象のワークブック. Defaults to active book.
+        position (int, optional): 追加する位置. Defaults to 0.
 
     Returns:
-        bool: True:存在する, False:存在しない
-        sh: シート
+        xw.Sheet or None: 追加されたシート、または失敗した場合はNone
     """
-
-    if wb == None:  # Excelが起動していない場合はFalseを返す
-        try:
+    try:
+        if wb is None:
             wb = xw.books.active
-        except:
-            return False
+    except Exception as e:
+        logging.error(f"アクティブなワークブックの取得に失敗: {e}")
+        return None
 
     try:
-        sh = wb.sheets.add(sheet_name, before=wb.sheets[position])
-    except:
-        sh = wb.sheets[sheet_name]
-        all_sh_name = [sh.name for sh in wb.sheets]
-        counter = 2
-
-        while True:
-            if f"{sheet_name} ({counter})" in all_sh_name:
+        return wb.sheets.add(sheet_name, before=wb.sheets[position])
+    except ValueError:
+        logging.warning(f"シート '{sheet_name}' は既に存在します。既存のシートをリネームして新しいシートを追加します。")
+        try:
+            existing_sheet = wb.sheets[sheet_name]
+            all_sheet_names = [sh.name for sh in wb.sheets]
+            counter = 2
+            while True:
+                new_sheet_name = f"{sheet_name} ({counter})"
+                if new_sheet_name not in all_sheet_names:
+                    break
                 counter += 1
                 if counter > 50:
-                    return False  # 50も作成してたらおかしいのでその場合はFalseを返す
-            else:
-                break
-
-        sh.name = f"{sheet_name} ({counter})"
-        sh = wb.sheets.add(sheet_name, before=wb.sheets[position])
-
-    return sh
+                    logging.error("50回試みましたが、ユニークなシート名を作成できませんでした。")
+                    return None
+            existing_sheet.name = new_sheet_name
+            return wb.sheets.add(sheet_name, before=wb.sheets[position])
+        except Exception as e:
+            logging.error(f"シートの追加/リネーム中にエラーが発生: {e}")
+            return None
 
 
 def check_sheet_copy(sheet_source_name, wb_source=None, wb_destination=None, position=0):
-    """同名シートが存在するかチェックしてシートコピー
+    """
+    同名シートが存在するかチェックしてシートをコピーします。
+    コピー先に同名シートが存在する場合、既存のシートをリネームします。
 
     Args:
-        sheet_name (str): シート名
-        wb (xw.Book, optional): xw.Book. Defaults to None.
-        position (int, optional): 位置. Defaults to 0.
+        sheet_source_name (str): コピー元のシート名
+        wb_source (xw.Book, optional): コピー元のワークブック. Defaults to active book.
+        wb_destination (xw.Book, optional): コピー先のワークブック. Defaults to source book.
+        position (int, optional): コピー先の位置. Defaults to 0.
 
     Returns:
-        bool: True:存在する, False:存在しない
-        sh: シート
+        xw.Sheet or None: コピーされたシート、または失敗した場合はNone
     """
+    try:
+        if wb_source is None:
+            wb_source = xw.books.active
+        if wb_destination is None:
+            wb_destination = wb_source
+    except Exception as e:
+        logging.error(f"アクティブなワークブックの取得に失敗: {e}")
+        return None
 
-    if wb_destination == None:  # Excelが起動していない場合はFalseを返す
-        try:
-            wb_destination = xw.books.active
-        except:
-            return False
-
-    all_sh_name = [sh.name for sh in wb_destination.sheets]
-
-    if sheet_source_name in all_sh_name:
-        # 同名シートが存在するので(*)を付ける
-        counter = 2
-
-        while True:
-            if f"{sheet_source_name} ({counter})" in all_sh_name:
+    try:
+        all_dest_sheet_names = [sh.name for sh in wb_destination.sheets]
+        if sheet_source_name in all_dest_sheet_names:
+            logging.warning(f"コピー先のブックにシート '{sheet_source_name}' は既に存在します。既存のシートをリネームします。")
+            existing_sheet = wb_destination.sheets[sheet_source_name]
+            counter = 2
+            while True:
+                new_sheet_name = f"{sheet_source_name} ({counter})"
+                if new_sheet_name not in all_dest_sheet_names:
+                    break
                 counter += 1
                 if counter > 50:
-                    return False  # 50も作成してたらおかしいのでその場合はFalseを返す
-            else:
-                break
-        sheet = wb_destination.sheets[sheet_source_name]
-        sheet.name = f"{sheet_source_name} ({counter})"
+                    logging.error("50回試みましたが、ユニークなシート名を作成できませんでした。")
+                    return None
+            existing_sheet.name = new_sheet_name
 
-    add_sh = wb_source.sheets[sheet_source_name].copy(before=wb_destination.sheets[position])
-
-    return add_sh
+        source_sheet = wb_source.sheets[sheet_source_name]
+        return source_sheet.copy(before=wb_destination.sheets[position])
+    except Exception as e:
+        logging.error(f"シートのコピー中にエラーが発生: {e}")
+        return None

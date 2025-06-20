@@ -1,155 +1,147 @@
-import xlwings as xw
+import logging
 from typing import List, Tuple
 
-from xlwingshelper.utility_functions import *
+import xlwings as xw
+
+# loggingを設定
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def get_max_row(sheet):
+def get_last_cell(sheet: xw.Sheet) -> Tuple[int, int]:
     """
-    旧名 : all
-    Finds the maximum row number with data in any column of the given Excel sheet.
+    指定されたExcelシートでデータを持つ最後のセルの座標を見つけます。
+    これはused_rangeに基づいています。
 
     Args:
-        sheet: The Excel sheet to be analyzed.
+        sheet (xw.Sheet): 分析対象のExcelシート。
 
     Returns:
-        The maximum row number with data.
+        tuple: 最後の列のインデックスと最後の行のインデックスを含むタプル。(列, 行)
+               シートが空の場合やエラーが発生した場合は(0, 0)を返します。
+    """
+    try:
+        # 完全に空のシートのused_rangeはA1です。A1も空かどうかを確認します。
+        if sheet.used_range.address == "$A$1" and sheet.range("A1").value is None:
+            return 0, 0
+        last_cell = sheet.used_range.last_cell
+        return last_cell.column, last_cell.row
+    except Exception as e:
+        logging.error(f"get_last_cellで例外発生: {e}")
+        return 0, 0
+
+
+def get_max_row(sheet: xw.Sheet) -> int:
+    """
+    指定されたExcelシートのいずれかの列にあるデータを持つ最大行番号を見つけます。
+
+    Args:
+        sheet (xw.Sheet): 分析対象のExcelシート。
+
+    Returns:
+        int: データを持つ最大行番号。シートが空またはエラーの場合は0を返します。
+    """
+    try:
+        _, last_row = get_last_cell(sheet)
+        return last_row
+    except Exception as e:
+        logging.error(f"get_max_rowで例外発生: {e}")
+        return 0
+
+
+def get_last_row_in_col(sheet: xw.Sheet, col: int | str = 1) -> int:
+    """
+    指定されたExcelシートの指定された列でデータを持つ最後の行を見つけます。
+
+    Args:
+        sheet (xw.Sheet): 分析対象のExcelシート。
+        col (int or str): 列インデックス（1から始まる）または文字（例: 'A'）。
+
+    Returns:
+        int: 指定された列のデータを持つ最後のセルの行番号。
 
     Raises:
-        ValueError: If the sheet is empty or other unexpected conditions occur.
-
+        ValueError: 指定された列インデックスが無効な場合。
     """
-    max_col = sheet.range(1, sheet.cells.last_cell.column).end("left").column
+    try:
+        if isinstance(col, str):
+            col_num = sheet.range(f"{col}1").column
+        elif isinstance(col, int):
+            if col < 1:
+                raise ValueError("列インデックスは1以上でなければなりません。")
+            col_num = col
+        else:
+            raise ValueError("列は整数または文字列でなければなりません。")
 
-    last_row = 1
-    for i in range(1, max_col + 1):
-        max_row = sheet.range(sheet.cells.last_cell.row, i).end("up").row
-        if max_row > last_row:
-            last_row = max_row
+        return sheet.range(sheet.cells.last_cell.row, col_num).end("up").row
+    except Exception as e:
+        logging.error(f"get_last_row_in_colで例外発生: {e}")
+        if "ValueError" in str(e):
+            raise ValueError(f"無効な列識別子: {col}") from e
+        return 0
 
-    return last_row
 
-
-def get_last_cell(sheet):
+def get_col_values(sheet: xw.Sheet, col_start: int = 1, col_end: int = 0) -> Tuple[int, int, List[List] | List]:
     """
-    旧名 : last
-    Finds the coordinates of the last cell with data in the specified Excel sheet.
-
-    This function locates the rightmost column with data in the first row and then
-    iterates through each column to find the bottommost row with data.
-
-    Example:
-        last_col, last_row = get_last_cell_coordinates(sheet)
+    指定されたExcelシートから列の値を抽出します。
 
     Args:
-        sheet (xlwings.Sheet): The Excel sheet to be analyzed.
+        sheet (xw.Sheet): 値を抽出するExcelシート。
+        col_start (int): 開始列インデックス（1から始まる）。
+        col_end (int): 終了列インデックス（1から始まる）。0の場合、使用されている最後の列まで読み取ります。
 
     Returns:
-        tuple: A tuple containing the index of the last column with data and the index of the last row with data.
-
+        Tuple[int, int, List[List]]: 以下を含むタプル:
+            - 使用された最後の列インデックス
+            - 使用された最後の行インデックス
+            - 各内部リストが列の値を表すリストのリスト。
     """
-    last_col = sheet.range(1, sheet.cells.last_cell.column).end("left").column
-    last_row = 1
+    try:
+        last_col, last_row = get_last_cell(sheet)
+        if last_col == 0:
+            return 0, 0, []
 
-    for i in range(1, last_col + 1):
-        current_row = sheet.range(sheet.cells.last_cell.row, i).end("up").row
-        if current_row > last_row:
-            last_row = current_row
+        if col_end == 0 or col_end > last_col:
+            col_end = last_col
+        if col_start < 1 or col_end < col_start:
+            raise ValueError("無効な開始または終了列インデックスです。")
 
-    return last_col, last_row
+        data = sheet.range((1, col_start), (last_row, col_end)).options(transpose=True).value
+
+        if col_start == col_end:
+            return last_col, last_row, [data]
+        return last_col, last_row, data
+    except Exception as e:
+        logging.error(f"get_col_valuesで例外発生: {e}")
+        return 0, 0, []
 
 
-def get_last_row_in_col(sheet, col=1):
+def get_row_values(sheet: xw.Sheet, row_start: int = 1, row_end: int = 0) -> Tuple[int, int, List[List] | List]:
     """
-    Finds the last row with data in a specified column of the given Excel sheet.
-
-    Example:
-        last_row = get_last_row_in_col(sheet, col=1)
+    指定されたExcelシートから行の値を抽出します。
 
     Args:
-        sheet (xlwings.Sheet): The Excel sheet to be analyzed.
-        col (int or str): The column index (1-based) or letter to find the last row with data.
+        sheet (xw.Sheet): 値を抽出するExcelシート。
+        row_start (int): 開始行インデックス（1から始まる）。
+        row_end (int): 終了行インデックス（1から始まる）。0の場合、使用されている最後の行まで読み取ります。
 
     Returns:
-        int: The row number of the last cell with data in the specified column.
-
-    Raises:
-        ValueError: If the specified column index is invalid or out of range.
-
+        Tuple[int, int, List[List]]: 以下を含むタプル:
+            - 使用された最後の列インデックス
+            - 使用された最後の行インデックス
+            - 各内部リストが行の値を表すリストのリスト。
     """
-    if isinstance(col, int):
-        if col < 1:
-            raise ValueError("Invalid column index. It must be an integer greater than 0.")
-        col_num = col
-    elif isinstance(col, str):
-        # ここでアルファベット表記を数値インデックスに変換
-        col_num = alpha_to_num(col)
-    else:
-        raise ValueError("Column must be an integer or a string.")
+    try:
+        last_col, last_row = get_last_cell(sheet)
+        if last_row == 0:
+            return 0, 0, []
 
-    last_row = sheet.range(sheet.cells.last_cell.row, col_num).end("up").row
-    return last_row
+        if row_end == 0 or row_end > last_row:
+            row_end = last_row
+        if row_start < 1 or row_end < row_start:
+            raise ValueError("無効な開始または終了行インデックスです。")
 
-
-def get_col_values(sheet, colstart: int = 0, colend: int = 0) -> Tuple[int, int, List[List]]:
-    """
-    旧名 : all_col,col_dict
-    Extracts the values of columns from the specified Excel sheet.
-
-    Args:
-        sheet: The Excel sheet from which to extract values.
-        colstart (int): The starting column index (0-indexed).
-        colend (int): The ending column index (0-indexed). If 0, reads till the last column.
-
-    Returns:
-        Tuple containing the last column index, last row index, and a list of column values.
-
-    Raises:
-        ValueError: If `colstart` or `colend` are out of range.
-
-    """
-    last_col, last_row = get_last_cell(sheet)
-
-    if colend == 0 or colend > last_col:
-        colend = last_col
-    if colstart < 0 or colend < colstart:
-        raise ValueError("Invalid column start or end index")
-
-    col_values = []
-    for col in range(colstart, colend):
-        strcol = num_to_alpha(col + 1)
-        col_values.append(sheet.range(strcol + "1:" + strcol + str(last_row)).value)
-
-    return last_col, last_row, col_values
-
-
-def get_row_values(sheet, rowstart: int = 0, rowend: int = 0):
-    """
-    旧名 : all_row
-    Extracts values of rows from the specified Excel sheet and returns them as a list of lists.
-
-    Args:
-        sheet: The Excel sheet from which to extract values.
-        rowstart (int): The starting row index (1-indexed).
-        rowend (int): The ending row index (1-indexed). If 0, reads till the last row.
-
-    Returns:
-        Tuple containing the last column index, last row index, and a list of row values.
-
-    Raises:
-        ValueError: If `rowstart` or `rowend` are out of range.
-
-    """
-    last_col, last_row = get_last_cell(sheet)
-
-    if rowend == 0 or rowend > last_row:
-        rowend = last_row
-    if rowstart < 1 or rowend < rowstart:
-        raise ValueError("Invalid row start or end index")
-
-    row_values = []
-    strlastcol = num_to_alpha(last_col)
-    for row in range(rowstart, rowend):
-        row_values.append(sheet.range("A" + str(row + 1) + ":" + strlastcol + str(row + 1)).value)
-
-    return last_col, last_row, row_values
+        data = sheet.range((row_start, 1), (row_end, last_col)).options(ndim=2).value
+        return last_col, last_row, data
+    except Exception as e:
+        logging.error(f"get_row_valuesで例外発生: {e}")
+        return 0, 0, []
