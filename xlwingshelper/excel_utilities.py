@@ -2,51 +2,64 @@ import xlwings as xw
 import os
 
 
-def FreezePanes(ws=None, wb=None, row=1, col=0):
-    """ウインドウ枠の固定
+def FreezePanes(ws=None, row=1, col=0):
+    """
+    ウインドウ枠の固定
 
     Args:
-        ws (_type_, optional): _description_. Defaults to xw.books.active.app.api.ActiveWindow.
-        wb (_type_, optional): _description_. Defaults to xw.books.active.
-        row (int, optional): _description_. Defaults to 1.
-        col (int, optional): _description_. Defaults to 0.
+        ws (xw.Sheet, optional): 固定したいワークシート
+        row (int, optional): 固定したい行番号
+        col (int, optional): 固定したい列番号
     """
-
-    if ws == None:
-        try:
+    try:
+        # wsがなければアクティブなものを取得
+        if ws is None:
             ws = xw.books.active.sheets.active
-        except:
+
+        ws.activate()
+        wb = ws.book  # wsからbookを確実に取得
+
+        aw = wb.app.api.ActiveWindow
+        if aw is None:
+            print("ActiveWindowが取得できません。")
             return False
 
-    ws.activate()
-    wb = xw.books.active
-    aw = wb.app.api.ActiveWindow
-    aw.FreezePanes = False
-    aw.SplitColumn = col
-    aw.SplitRow = row
-    aw.FreezePanes = True
+        aw.FreezePanes = False
+        aw.SplitColumn = col
+        aw.SplitRow = row
+        aw.FreezePanes = True
+        return True
+    except Exception as e:
+        print(f"FreezePanesで例外発生: {e}")
+        return False
 
 
-def FreezePanes0(ws=None, wb=None, row=0, col=0):
-    """ウインドウ枠固定の解除
+def FreezePanes0(ws=None):
+    """
+    ウインドウ枠固定の解除
+
     Args:
-        ws (_type_, optional): _description_. Defaults to xw.books.active.app.api.ActiveWindow.
-        wb (_type_, optional): _description_. Defaults to xw.books.active.
-        row (int, optional): _description_. Defaults to 1.
-        col (int, optional): _description_. Defaults to 0.
+        ws (xw.Sheet, optional): 操作対象シート
     """
-    if ws == None:
-        try:
+    try:
+        if ws is None:
             ws = xw.books.active.sheets.active
-        except:
+
+        ws.activate()
+        wb = ws.book
+        aw = wb.app.api.ActiveWindow
+
+        if aw is None:
+            print("ActiveWindowが取得できません")
             return False
 
-    ws.activate()
-    wb = xw.books.active
-    aw = wb.app.api.ActiveWindow
-    aw.FreezePanes = False
-    aw.SplitColumn = 0
-    aw.SplitRow = 0
+        aw.FreezePanes = False
+        aw.SplitColumn = 0
+        aw.SplitRow = 0
+        return True
+    except Exception as e:
+        print(f"FreezePanes0で例外発生: {e}")
+        return False
 
 
 def check_wb_create(save_wb_path, extension=".xlsx"):
@@ -67,11 +80,7 @@ def check_wb_create(save_wb_path, extension=".xlsx"):
             try:
                 os.rename(
                     save_wb_path,
-                    str(os.path.splitext(save_wb_path)[0])
-                    + " ("
-                    + str(counter)
-                    + ")"
-                    + extension,
+                    str(os.path.splitext(save_wb_path)[0]) + " (" + str(counter) + ")" + extension,
                 )
             except:
                 pass
@@ -126,9 +135,7 @@ def check_sheet_add(sheet_name, wb=None, position=0):
     return sh
 
 
-def check_sheet_copy(
-    sheet_source_name, wb_source=None, wb_destination=None, position=0
-):
+def check_sheet_copy(sheet_source_name, wb_source=None, wb_destination=None, position=0):
     """同名シートが存在するかチェックしてシートコピー
 
     Args:
@@ -163,8 +170,6 @@ def check_sheet_copy(
         sheet = wb_destination.sheets[sheet_source_name]
         sheet.name = f"{sheet_source_name} ({counter})"
 
-    add_sh = wb_source.sheets[sheet_source_name].copy(
-        before=wb_destination.sheets[position]
-    )
+    add_sh = wb_source.sheets[sheet_source_name].copy(before=wb_destination.sheets[position])
 
     return add_sh

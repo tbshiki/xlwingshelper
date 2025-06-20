@@ -68,7 +68,7 @@ def get_last_row_in_col(sheet, col=1):
 
     Args:
         sheet (xlwings.Sheet): The Excel sheet to be analyzed.
-        col (int): The column index (1-based) to find the last row with data.
+        col (int or str): The column index (1-based) or letter to find the last row with data.
 
     Returns:
         int: The row number of the last cell with data in the specified column.
@@ -77,18 +77,21 @@ def get_last_row_in_col(sheet, col=1):
         ValueError: If the specified column index is invalid or out of range.
 
     """
-    if not isinstance(col, int) or col < 1:
-        raise ValueError("Invalid column index. It must be an integer greater than 0.")
+    if isinstance(col, int):
+        if col < 1:
+            raise ValueError("Invalid column index. It must be an integer greater than 0.")
+        col_num = col
+    elif isinstance(col, str):
+        # ここでアルファベット表記を数値インデックスに変換
+        col_num = alpha_to_num(col)
+    else:
+        raise ValueError("Column must be an integer or a string.")
 
-    # Convert column index to letter representation for use with xlwings
-    col_letter = num_to_alpha(col)
-    last_row = sheet.range(sheet.cells.last_cell.row, col_letter).end("up").row
+    last_row = sheet.range(sheet.cells.last_cell.row, col_num).end("up").row
     return last_row
 
 
-def get_col_values(
-    sheet, colstart: int = 0, colend: int = 0
-) -> Tuple[int, int, List[List]]:
+def get_col_values(sheet, colstart: int = 0, colend: int = 0) -> Tuple[int, int, List[List]]:
     """
     旧名 : all_col,col_dict
     Extracts the values of columns from the specified Excel sheet.
@@ -147,8 +150,6 @@ def get_row_values(sheet, rowstart: int = 0, rowend: int = 0):
     row_values = []
     strlastcol = num_to_alpha(last_col)
     for row in range(rowstart, rowend):
-        row_values.append(
-            sheet.range("A" + str(row + 1) + ":" + strlastcol + str(row + 1)).value
-        )
+        row_values.append(sheet.range("A" + str(row + 1) + ":" + strlastcol + str(row + 1)).value)
 
     return last_col, last_row, row_values
