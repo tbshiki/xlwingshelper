@@ -14,7 +14,7 @@ from .excel_utilities import (
     check_sheet_copy,
     check_wb_create,
 )
-from .windows_dialogs import MessageBox
+from .windows_dialogs import MessageBox, highlight_window
 
 __all__ = [
     # data_retrieval
@@ -31,4 +31,5 @@ __all__ = [
     "check_sheet_copy",
     # windows_dialogs
     "MessageBox",
+    "highlight_window",
 ]
