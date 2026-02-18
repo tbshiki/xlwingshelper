@@ -1,10 +1,12 @@
 import logging
-from typing import List, Tuple
+from typing import Any, List, Tuple, cast
 
 import xlwings as xw
 
 # loggingを設定
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+RangeValues = List[List[Any]] | List[Any]
 
 
 def get_last_cell(sheet: xw.Sheet) -> Tuple[int, int]:
@@ -80,7 +82,7 @@ def get_last_row_in_col(sheet: xw.Sheet, col: int | str = 1) -> int:
         return 0
 
 
-def get_col_values(sheet: xw.Sheet, col_start: int = 1, col_end: int = 0) -> Tuple[int, int, List[List] | List]:
+def get_col_values(sheet: xw.Sheet, col_start: int = 1, col_end: int = 0) -> Tuple[int, int, RangeValues]:
     """
     指定されたExcelシートから列の値を抽出します。
 
@@ -105,17 +107,19 @@ def get_col_values(sheet: xw.Sheet, col_start: int = 1, col_end: int = 0) -> Tup
         if col_start < 1 or col_end < col_start:
             raise ValueError("無効な開始または終了列インデックスです。")
 
-        data = sheet.range((1, col_start), (last_row, col_end)).options(transpose=True).value
+        raw_data = sheet.range((1, col_start), (last_row, col_end)).options(transpose=True).value
+        if raw_data is None:
+            return last_col, last_row, []
 
         if col_start == col_end:
-            return last_col, last_row, [data]
-        return last_col, last_row, data
+            return last_col, last_row, [raw_data]
+        return last_col, last_row, cast(RangeValues, raw_data)
     except Exception as e:
         logging.error(f"get_col_valuesで例外発生: {e}")
         return 0, 0, []
 
 
-def get_row_values(sheet: xw.Sheet, row_start: int = 1, row_end: int = 0) -> Tuple[int, int, List[List] | List]:
+def get_row_values(sheet: xw.Sheet, row_start: int = 1, row_end: int = 0) -> Tuple[int, int, RangeValues]:
     """
     指定されたExcelシートから行の値を抽出します。
 
@@ -140,8 +144,10 @@ def get_row_values(sheet: xw.Sheet, row_start: int = 1, row_end: int = 0) -> Tup
         if row_start < 1 or row_end < row_start:
             raise ValueError("無効な開始または終了行インデックスです。")
 
-        data = sheet.range((row_start, 1), (row_end, last_col)).options(ndim=2).value
-        return last_col, last_row, data
+        raw_data = sheet.range((row_start, 1), (row_end, last_col)).options(ndim=2).value
+        if raw_data is None:
+            return last_col, last_row, []
+        return last_col, last_row, cast(RangeValues, raw_data)
     except Exception as e:
         logging.error(f"get_row_valuesで例外発生: {e}")
         return 0, 0, []
