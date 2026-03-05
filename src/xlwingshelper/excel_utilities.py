@@ -66,6 +66,66 @@ def FreezePanes0(ws=None):
         return False
 
 
+def apply_autofilter(sheet, data_row_count, last_col, header_row=1, first_col=1):
+    """
+    ヘッダー付き範囲に AutoFilter を安全に適用する。
+    - data_row_count <= 0 の場合は適用せず、既存フィルタ状態のみ解除する
+    - COM 例外時は AutoFilter(1) をフォールバックで試行する
+
+    Args:
+        sheet (xw.Sheet): 対象シート
+        data_row_count (int): ヘッダーを除くデータ行数
+        last_col (int): 最終列番号（1始まり）
+        header_row (int, optional): ヘッダー行番号. Defaults to 1.
+        first_col (int, optional): 開始列番号. Defaults to 1.
+
+    Returns:
+        bool: AutoFilter を適用できた場合 True。未適用/失敗時は False。
+    """
+    if sheet is None:
+        logging.warning("apply_autofilter: sheet が None のため処理をスキップします。")
+        return False
+
+    try:
+        row_count = int(data_row_count)
+    except Exception:
+        row_count = 0
+
+    try:
+        if bool(sheet.api.FilterMode):
+            sheet.api.ShowAllData()
+    except Exception:
+        pass
+
+    try:
+        sheet.api.AutoFilterMode = False
+    except Exception:
+        pass
+
+    if row_count <= 0:
+        return False
+
+    if last_col < first_col:
+        logging.warning("apply_autofilter: 列指定が不正です。first_col=%s, last_col=%s", first_col, last_col)
+        return False
+
+    last_row = header_row + row_count  # +1 はヘッダー行
+    target = sheet.range((header_row, first_col), (last_row, last_col))
+
+    try:
+        target.api.AutoFilter()
+        return True
+    except Exception as exc:
+        logging.warning("apply_autofilter: AutoFilter() 失敗。フォールバックを試行します: %s", exc)
+
+    try:
+        target.api.AutoFilter(1)
+        return True
+    except Exception as exc:
+        logging.warning("apply_autofilter: AutoFilter(1) も失敗しました: %s", exc)
+        return False
+
+
 def check_wb_create(save_wb_path):
     """
     同名のブックが存在するかチェックしてブックを作成します。

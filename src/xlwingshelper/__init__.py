@@ -10,6 +10,7 @@ from .data_retrieval import (
 from .excel_utilities import (
     FreezePanes,
     FreezePanes0,
+    apply_autofilter,
     check_sheet_add,
     check_sheet_copy,
     check_wb_create,
@@ -26,6 +27,7 @@ __all__ = [
     # excel_utilities
     "FreezePanes",
     "FreezePanes0",
+    "apply_autofilter",
     "check_wb_create",
     "check_sheet_add",
     "check_sheet_copy",
